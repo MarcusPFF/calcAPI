@@ -30,7 +30,6 @@ public class Calculation {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
-    // Relationship to User
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
