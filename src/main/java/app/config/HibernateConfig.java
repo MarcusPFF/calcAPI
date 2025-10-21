@@ -2,7 +2,6 @@ package app.config;
 
 import app.entities.Calculation;
 import app.entities.User;
-
 import app.exceptions.ApiException;
 import app.utils.Utils;
 import jakarta.persistence.EntityManagerFactory;
@@ -34,12 +33,17 @@ public class HibernateConfig {
     }
 
     public static EntityManagerFactory getEntityManagerFactoryForTest() {
-        if (emfTest == null){
+        if (emfTest == null) {
             setTest(true);
             emfTest = createEMF(getTest());
         }
         return emfTest;
     }
+
+    public static EntityManagerFactory createNewEntityManagerFactoryForTest() {
+        return createEMF(true);
+    }
+
 
     // TODO: IMPORTANT: Add Entity classes here for them to be registered with Hibernate
     private static void getAnnotationConfiguration(Configuration configuration) {
@@ -69,8 +73,7 @@ public class HibernateConfig {
             SessionFactory sf = configuration.buildSessionFactory(serviceRegistry);
             EntityManagerFactory emf = sf.unwrap(EntityManagerFactory.class);
             return emf;
-        }
-        catch (Throwable ex) {
+        } catch (Throwable ex) {
             System.err.println("Initial SessionFactory creation failed." + ex);
             throw new ExceptionInInitializerError(ex);
         }

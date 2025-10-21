@@ -5,6 +5,7 @@ import app.entities.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.*;
+import org.testcontainers.containers.PostgreSQLContainer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -17,20 +18,25 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class HibernateConfigTest {
 
+    private PostgreSQLContainer<?> postgres;
     private EntityManagerFactory emf;
 
     @BeforeAll
     void setup() {
-        // Use Hibernate's built-in Testcontainers setup
+        postgres = new PostgreSQLContainer<>("postgres:15.3-alpine3.18")
+                .withDatabaseName("test_hibernate")
+                .withUsername("postgres")
+                .withPassword("postgres");
+        postgres.start();
+
         HibernateConfig.setTest(true);
-        emf = HibernateConfig.getEntityManagerFactoryForTest();
+        emf = HibernateConfig.createNewEntityManagerFactoryForTest();
     }
 
     @AfterAll
     void tearDown() {
-        if (emf != null && emf.isOpen()) {
-            emf.close();
-        }
+        if (emf != null && emf.isOpen()) emf.close();
+        postgres.stop();
     }
 
     @Test

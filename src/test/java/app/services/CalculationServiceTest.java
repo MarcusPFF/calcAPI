@@ -18,8 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CalculationServiceTest {
 
-    private static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15.3-alpine3.18").withDatabaseName("test_db").withUsername("postgres").withPassword("postgres");
-
+    private PostgreSQLContainer<?> postgres;
     private EntityManagerFactory emf;
     private CalculationService calcService;
     private UserService userService;
@@ -27,11 +26,17 @@ class CalculationServiceTest {
 
     @BeforeAll
     void setup() {
+        postgres = new PostgreSQLContainer<>("postgres:15.3-alpine3.18")
+                .withDatabaseName("test_calc")
+                .withUsername("postgres")
+                .withPassword("postgres");
         postgres.start();
+
         HibernateConfig.setTest(true);
-        emf = HibernateConfig.getEntityManagerFactoryForTest();
+        emf = HibernateConfig.createNewEntityManagerFactoryForTest();
         userService = new UserService(emf);
         calcService = new CalculationService(emf);
+
         testUser = userService.registerUser("MathUser", "password", Role.GUEST);
     }
 
