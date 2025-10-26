@@ -1,0 +1,69 @@
+@url = http://localhost:7070/api
+@admin_username = admin
+@guest_username = guest
+
+### Register ADMIN user
+POST {{url}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{admin_username}}",
+  "password": "secret123",
+  "role": "ADMIN"
+}
+
+### Login as ADMIN
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{admin_username}}",
+  "password": "secret123"
+}
+
+> {% client.global.set("admin_token", response.body.token); %}
+
+### Admin-only endpoint (should be allowed)
+GET {{url}}/admin/panel
+Authorization: Bearer {{admin_token}}
+
+> {% client.test("Admin can access admin panel", function() {
+        client.assert(response.status === 200, "Expected 200");
+    }); %}
+
+### Register GUEST user
+POST {{url}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{guest_username}}",
+  "password": "pass123",
+  "role": "GUEST"
+}
+
+### Login as GUEST
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{guest_username}}",
+  "password": "pass123"
+}
+
+> {% client.global.set("guest_token", response.body.token); %}
+
+### Guest cannot access admin panel (expect 403)
+GET http://localhost:7070/api/admin/panel
+Authorization: Bearer {{guest_token}}
+
+> {%
+    // IntelliJ HTTP Client tests:
+    client.test("Guest is forbidden from admin panel", function () {
+        client.assert(response.status === 403, "Should be 403");
+        // Body may be JSON from our ForbiddenResponse handler:
+        let body = {};
+        try { body = JSON.parse(response.body); } catch (e) {}
+        const msg = (body.message || body.error || "").toLowerCase();
+        client.assert(msg.includes("admin only") || msg.includes("forbidden"),
+            "Body should mention 'admin only' or 'forbidden'");
+    });
