@@ -1,18 +1,15 @@
 package app.exceptions;
 
-public class NotAuthorizedException extends Exception {
-    private final int statusCode;
+public class NotAuthorizedException extends RuntimeException {
+    private final int status;
 
-    public NotAuthorizedException(int statusCode, String message) {
+    public NotAuthorizedException(String message, int status) {
         super(message);
-        this.statusCode = statusCode;
+        this.status = status;
     }
-    public NotAuthorizedException(int statusCode, String message, Throwable cause) {
-        super(message, cause);
-        this.statusCode = statusCode;
-    }
+    public int getStatus() { return status; }
 
-    public int getStatusCode() {
-        return statusCode;
+    public static NotAuthorizedException unauthorized(String msg) {
+        return new NotAuthorizedException(msg, 401);
     }
 }
