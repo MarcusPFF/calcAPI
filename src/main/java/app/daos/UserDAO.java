@@ -60,7 +60,6 @@ public class UserDAO implements IDAO<User, Integer> {
         }
     }
 
-    // Extra method specific for User
     public User findByUsername(String username) {
         try (EntityManager em = emf.createEntityManager()) {
             return em.createQuery("SELECT u FROM User u WHERE u.username = :username", User.class)

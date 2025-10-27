@@ -27,8 +27,7 @@ public class HibernateConfig {
     }
 
     public static EntityManagerFactory getEntityManagerFactory() {
-        if (emf == null)
-            emf = createEMF(getTest());
+        if (emf == null) emf = createEMF(getTest());
         return emf;
     }
 
@@ -67,9 +66,7 @@ public class HibernateConfig {
             configuration.setProperties(props);
             getAnnotationConfiguration(configuration);
 
-            ServiceRegistry serviceRegistry = new StandardServiceRegistryBuilder()
-                    .applySettings(configuration.getProperties())
-                    .build();
+            ServiceRegistry serviceRegistry = new StandardServiceRegistryBuilder().applySettings(configuration.getProperties()).build();
             SessionFactory sf = configuration.buildSessionFactory(serviceRegistry);
             EntityManagerFactory emf = sf.unwrap(EntityManagerFactory.class);
             return emf;
@@ -83,7 +80,7 @@ public class HibernateConfig {
         props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
         props.put("hibernate.connection.driver_class", "org.postgresql.Driver");
         //CHANGE HERE
-      //  props.put("hibernate.hbm2ddl.auto", "create");
+        //  props.put("hibernate.hbm2ddl.auto", "create");
         props.put("hibernate.current_session_context_class", "thread");
         props.put("hibernate.show_sql", "false");
         props.put("hibernate.format_sql", "false");

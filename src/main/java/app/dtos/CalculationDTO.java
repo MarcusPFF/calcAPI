@@ -29,5 +29,6 @@ public class CalculationDTO {
         this.timestamp = calc.getTimestamp();
         if (calc.getUser() != null) {
             this.username = calc.getUser().getUsername();
-        }    }
+        }
+    }
 }

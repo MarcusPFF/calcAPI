@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 Custom api/routes overview since the default javalin one does not show roles anymore after AccessManager was removed.
 It just displayed empty Array. Now this custom overview has that feature and cool inline styling.
  */
+
 public final class RouteDocs {
     private RouteDocs() {}
 
