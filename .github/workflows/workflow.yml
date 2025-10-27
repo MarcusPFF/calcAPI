@@ -25,8 +25,21 @@ jobs:
           java-version: '17'
           distribution: 'corretto'
 
+      # Create the file your Utils loads in dev mode
+      # Adjust filename/path if your Utils expects a different name.
+      - name: Create test config.properties
+        shell: bash
+        run: |
+          mkdir -p src/test/resources
+          cat > src/test/resources/config.properties <<EOF
+          SECRET_KEY=${SECRET_KEY}
+          ISSUER=${ISSUER}
+          TOKEN_EXPIRE_TIME=${TOKEN_EXPIRE_TIME}
+          EOF
+          echo "Wrote src/test/resources/config.properties"
+
       - name: Build with Maven
-        run: mvn --batch-mode clean package
+        run: mvn --batch-mode -DskipTests=false clean package
 
       # The steps below are for Docker deployment — comment them out for now
       # - name: Login to Docker Hub
