@@ -19,11 +19,11 @@ public class Routes {
         var admin = new AdminController(emf);
 
         return () -> {
-            // Auth – (An
+            // Auth – (Anyone endpoints)
             path("/auth", () -> {
-                get("/healthcheck", ctx -> ctx.json(java.util.Map.of("msg", "API is up and running")), Role.ANYONE);
-                post("/login", auth.login, Role.ANYONE);
-                post("/register", auth.register, Role.ANYONE);
+                get("/healthcheck", auth.health(), Role.ANYONE);
+                post("/login", auth.login(), Role.ANYONE);
+                post("/register", auth.register(), Role.ANYONE);
             });
 
             // Public (Public Endpoints)
@@ -40,7 +40,7 @@ public class Routes {
                 get("/users", admin.users(), Role.ADMIN);
             });
 
-            // Calc (Role-guarded)
+            // Calc (Guest-guarded)
             path("/calc", () -> {
                 post("/add", calc.add(), Role.GUEST, Role.ADMIN);
                 post("/subtract", calc.subtract(), Role.GUEST, Role.ADMIN);

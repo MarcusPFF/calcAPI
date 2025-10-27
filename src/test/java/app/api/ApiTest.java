@@ -432,4 +432,49 @@ public class ApiTest {
                 .then()
                 .statusCode(anyOf(is(400), is(500), is(200))); // Depends on your implementation
     }
+
+
+    private static boolean containsUser(List<Map<String, Object>> list, String username, String role) {
+        return list.stream().anyMatch(u ->
+                username.equals(u.get("username")) &&
+                        role.equals(String.valueOf(u.get("role")))
+        );
+    }
+
+    @Test @Order(13)
+    void admin_users_allows_admin_and_lists_users() {
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> users =
+                given()
+                        .header("Authorization", "Bearer " + adminToken)
+                        .when()
+                        .get("/admin/users")
+                        .then()
+                        .statusCode(200)
+                        .contentType(containsString("application/json"))
+                        .extract().as(List.class);
+
+        Assertions.assertFalse(users.isEmpty(), "Listen må ikke være tom");
+        // Tjek at både admin og guest, som vi registrerede i @Order(2), findes
+        Assertions.assertTrue(containsUser(users, adminUser, "ADMIN"), "Admin-brugeren skal være med");
+        Assertions.assertTrue(containsUser(users, guestUser, "GUEST"), "Guest-brugeren skal være med");
+    }
+
+    @Test @Order(14)
+    void admin_users_forbidden_for_guest() {
+        given()
+                .header("Authorization", "Bearer " + guestToken)
+                .when()
+                .get("/admin/users")
+                .then()
+                .statusCode(403);
+    }
+
+    @Test @Order(15)
+    void admin_users_unauthorized_when_missing_token() {
+        when()
+                .get("/admin/users")
+                .then()
+                .statusCode(401);
+    }
 }
