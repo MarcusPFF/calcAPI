@@ -6,6 +6,8 @@ import app.security.enums.Role;
 import jakarta.persistence.EntityManagerFactory;
 import org.mindrot.jbcrypt.BCrypt;
 
+import java.util.List;
+
 public class UserService {
 
     private final UserDAO userDAO;
@@ -44,5 +46,9 @@ public class UserService {
     //Get by ID
     public User findById(int id) {
         return userDAO.findById(id);
+    }
+
+    public List<User> getAllUsers() {
+        return userDAO.getAll();
     }
 }

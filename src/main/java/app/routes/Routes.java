@@ -1,5 +1,6 @@
 package app.routes;
 
+import app.controllers.AdminController;
 import app.controllers.CalculationController;
 import app.controllers.PublicController;
 import app.security.controllers.AuthController;
@@ -18,6 +19,8 @@ public class Routes {
         AuthController auth = new AuthController(emf);
         CalculationController calc = new CalculationController(emf);
         PublicController pub = new PublicController(emf);
+        AdminController admin = new AdminController(emf);
+
 
         Handler health = ctx -> ctx.json(Map.of("msg", "API is up and running"));
 
@@ -39,7 +42,8 @@ public class Routes {
 
             // Admin
             path("/admin", () -> {
-                get("/panel", ctx -> ctx.json(Map.of("ok", true, "msg", "Welcome, admin")), Role.ADMIN);
+                get("/panel", admin.panel, Role.ADMIN);
+                get("/users", admin.users, Role.ADMIN);
             });
 
             // Calculator (role-guarded)
