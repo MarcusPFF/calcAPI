@@ -4,6 +4,7 @@ import app.config.ApplicationConfig;
 import io.javalin.Javalin;
 import io.restassured.RestAssured;
 import org.junit.jupiter.api.*;
+import app.config.HibernateConfig;
 
 import java.util.List;
 import java.util.Map;
@@ -29,13 +30,12 @@ public class ApiTest {
 
     @BeforeAll
     static void start() {
+        HibernateConfig.setTest(true);
         server = ApplicationConfig.startServer(0);
         RestAssured.baseURI = "http://localhost:" + server.port();
         RestAssured.basePath = "/api";
         RestAssured.enableLoggingOfRequestAndResponseIfValidationFails();
-
-        // Use unique usernames per test run to avoid collisions
-        String runId = UUID.randomUUID().toString().substring(0, 8);
+        String runId = java.util.UUID.randomUUID().toString().substring(0, 8);
         adminUser = "admin_" + runId;
         guestUser = "guest_" + runId;
     }
