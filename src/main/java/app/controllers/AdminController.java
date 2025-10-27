@@ -13,12 +13,10 @@ public class AdminController {
         this.userService = new UserService(emf);
     }
 
-    // /api/admin/panel
     public Handler panel() {
         return ctx -> ctx.json(Map.of("ok", true, "msg", "Welcome, admin"));
     }
 
-    // /api/admin/users
     public Handler users() {
         return ctx -> {
             var out = userService.getAllUsers().stream()

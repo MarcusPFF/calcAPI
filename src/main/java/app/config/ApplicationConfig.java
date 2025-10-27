@@ -21,7 +21,7 @@ public class ApplicationConfig {
 
     public static void configuration(JavalinConfig config) {
         config.showJavalinBanner = false;
-        config.router.contextPath = "/api"; // min base-path
+        config.router.contextPath = "/api";
     }
 
     public static Javalin startServer(int port) {
@@ -32,22 +32,17 @@ public class ApplicationConfig {
             cfg.router.apiBuilder(new Routes().api(emf));
         });
 
-        // offentlig rute-oversigt + redirect fra /
         server.get("/routes", RouteDocs.overviewHtml);
         server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
-        // global jwt-guard (alt der ikke er offentligt, kræver token)
+        //Global JWT GUARD
         server.before(ctx -> {
-            if ("OPTIONS".equals(ctx.method())) return; // preflight må gerne slippe igennem
+            if ("OPTIONS".equals(ctx.method())) return;
 
-            String base = ctx.contextPath(); // fx "/api"
-            String p = ctx.path();            // fx "/api/..."
+            String base = ctx.contextPath();
+            String p = ctx.path();
 
-            boolean isPublic =
-                    p.equals(base + "/") ||
-                            p.equals(base + "/routes") ||
-                            p.startsWith(base + "/auth/") ||
-                            p.startsWith(base + "/public/");
+            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/");
 
             if (isPublic) return;
 
@@ -56,25 +51,17 @@ public class ApplicationConfig {
                 throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
 
             String token = header.substring("Bearer ".length()).trim();
-            if (!JwtUtil.validateToken(token))
-                throw NotAuthorizedException.unauthorized("Invalid or expired token");
+            if (!JwtUtil.validateToken(token)) throw NotAuthorizedException.unauthorized("Invalid or expired token");
 
             ctx.attribute("jwt.user", JwtUtil.getUsername(token));
             ctx.attribute("jwt.role", JwtUtil.getRole(token));
         });
 
-        // central fejlhåndtering
-        server.exception(ValidationException.class, (e, ctx) ->
-                ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()))
-        );
-        server.exception(NotAuthorizedException.class, (e, ctx) ->
-                ctx.status(e.getStatus() == 0 ? 401 : e.getStatus())
-                        .json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()))
-        );
+        server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+        server.exception(NotAuthorizedException.class, (e, ctx) -> ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
         server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
         server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
 
-        // simpel request-logging
         server.after(ApplicationConfig::afterRequest);
 
         server.start(port);
@@ -84,7 +71,7 @@ public class ApplicationConfig {
 
     public static void stopServer(Javalin server) {
         if (server != null) {
-            server.stop(); // stop roligt
+            server.stop();
             logger.info("Server stopped.");
         }
     }
