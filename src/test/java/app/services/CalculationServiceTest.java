@@ -75,7 +75,7 @@ class CalculationServiceTest {
 
     @Test
     void divideShouldThrowExceptionWhenDividingByZero() {
-        assertThrows(ArithmeticException.class, () -> calcService.divide(testUser, 10, 0));
+        assertThrows(ValidationException.class, () -> calcService.divide(testUser, 10, 0));
     }
 
     @Test

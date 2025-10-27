@@ -82,6 +82,7 @@ public class HibernateConfig {
     private static Properties setBaseProperties(Properties props) {
         props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
         props.put("hibernate.connection.driver_class", "org.postgresql.Driver");
+        //CHANGE HERE
       //  props.put("hibernate.hbm2ddl.auto", "create");
         props.put("hibernate.current_session_context_class", "thread");
         props.put("hibernate.show_sql", "false");
