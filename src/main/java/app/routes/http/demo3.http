@@ -1,0 +1,256 @@
+@url = http://localhost:7070/api
+@admin_username = admin
+@guest_username = guest
+
+### Public: healthcheck
+# @name Health
+GET {{url}}/auth/healthcheck
+
+> {% client.test("Healthcheck OK", () => client.assert(response.status === 200)); %}
+
+### Public: custom routes overview page (HTML)
+# @name RoutesOverview
+GET {{url}}/routes
+
+> {% client.test("Routes overview OK", () => client.assert(response.status === 200)); %}
+
+### Public: info
+# @name PublicInfo
+GET {{url}}/public/info
+
+> {% client.test("Public /info OK", () => client.assert(response.status === 200)); %}
+
+### Public: stats
+# @name PublicStats
+GET {{url}}/public/stats
+
+> {% client.test("Public /stats OK", () => client.assert(response.status === 200)); %}
+
+### Public: examples
+# @name PublicExamples
+GET {{url}}/public/examples
+
+> {% client.test("Public /examples OK", () => client.assert(response.status === 200)); %}
+
+### Public: list all calcs
+# @name PublicCalculations
+GET {{url}}/public/calculations
+
+> {% client.test("Public /calculations OK", () => client.assert(response.status === 200)); %}
+
+
+
+#######################################################################
+# ADMIN FLOW
+#######################################################################
+
+### Register ADMIN (idempotent-friendly)
+# @name RegisterAdmin
+POST {{url}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{admin_username}}",
+  "password": "secret123",
+  "role": "ADMIN"
+}
+
+> {% client.test("Register admin accepted", () => client.assert([200,400,409].includes(response.status))); %}
+
+### Login ADMIN (capture token)
+# @name LoginAdmin
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{admin_username}}",
+  "password": "secret123"
+}
+
+> {%
+    let data = response.body;
+    if (typeof data === "string") { try { data = JSON.parse(data); } catch(e) {} }
+    client.assert(data && data.token, "No token from admin login");
+    client.global.set("admin_token", data.token);
+%}
+
+### Admin-only endpoint (should be 200)
+# @name AdminPanelAllowed
+GET {{url}}/admin/panel
+Authorization: Bearer {{admin_token}}
+
+> {% client.test("Admin can access /admin/panel", () => client.assert(response.status === 200)); %}
+
+### Admin: multiply (allowed)
+# @name AdminMultiply
+POST {{url}}/calc/multiply
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "num1": 6,
+  "num2": 7
+}
+
+> {%
+    let b = response.body;
+    if (typeof b === "string") { try { b = JSON.parse(b); } catch(e) {} }
+    client.test("Admin multiply 6*7=42", () => {
+        client.assert(response.status === 200);
+        if (b && typeof b.result === "number") client.assert(b.result === 42);
+    });
+%}
+
+### Admin: divide (allowed)
+# @name AdminDivide
+POST {{url}}/calc/divide
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "num1": 42,
+  "num2": 6
+}
+
+> {%
+    let b = response.body;
+    if (typeof b === "string") { try { b = JSON.parse(b); } catch(e) {} }
+    client.test("Admin divide 42/6=7", () => {
+        client.assert(response.status === 200);
+        if (b && typeof b.result === "number") client.assert(b.result === 7);
+    });
+%}
+
+### Admin: see own calculations (allowed)
+# @name AdminGetMine
+GET {{url}}/calc/calculations
+Authorization: Bearer {{admin_token}}
+
+> {% client.test("Admin can GET /calc/calculations", () => client.assert(response.status === 200)); %}
+
+
+
+#######################################################################
+# GUEST FLOW
+#######################################################################
+
+### Register GUEST (idempotent-friendly)
+# @name RegisterGuest
+POST {{url}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{guest_username}}",
+  "password": "pass123",
+  "role": "GUEST"
+}
+
+> {% client.test("Register guest accepted", () => client.assert([200,400,409].includes(response.status))); %}
+
+### Login GUEST (capture token)
+# @name LoginGuest
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{guest_username}}",
+  "password": "pass123"
+}
+
+> {%
+    let data = response.body;
+    if (typeof data === "string") { try { data = JSON.parse(data); } catch(e) {} }
+    client.assert(data && data.token, "No token from guest login");
+    client.global.set("guest_token", data.token);
+%}
+
+### Guest cannot access admin panel (should be 403)
+# @name GuestAdminPanelDenied
+GET {{url}}/admin/panel
+Authorization: Bearer {{guest_token}}
+
+> {% client.test("Guest forbidden from /admin/panel", () => client.assert(response.status === 403)); %}
+
+### Guest: add (allowed) — capture calc_id
+# @name GuestAdd
+POST {{url}}/calc/add
+Authorization: Bearer {{guest_token}}
+Content-Type: application/json
+
+{
+  "num1": 2,
+  "num2": 5
+}
+
+> {%
+    let b = response.body;
+    if (typeof b === "string") { try { b = JSON.parse(b); } catch(e) {} }
+    client.test("Guest can add", () => client.assert(response.status === 200));
+    const id = b && b.id ? String(b.id) : "0";
+    client.global.set("calc_id", id);
+%}
+
+### Guest: subtract (allowed)
+# @name GuestSubtract
+POST {{url}}/calc/subtract
+Authorization: Bearer {{guest_token}}
+Content-Type: application/json
+
+{
+  "num1": 10,
+  "num2": 3
+}
+
+> {% client.test("Guest can subtract", () => client.assert(response.status === 200)); %}
+
+### Guest: multiply (should be 403)
+# @name GuestMultiplyDenied
+POST {{url}}/calc/multiply
+Authorization: Bearer {{guest_token}}
+Content-Type: application/json
+
+{
+  "num1": 3,
+  "num2": 3
+}
+
+> {% client.test("Guest forbidden to multiply", () => client.assert(response.status === 403)); %}
+
+### Guest: see own calculations (allowed)
+# @name GuestGetMine
+GET {{url}}/calc/calculations
+Authorization: Bearer {{guest_token}}
+
+> {% client.test("Guest can GET /calc/calculations", () => client.assert(response.status === 200)); %}
+
+
+
+#######################################################################
+# SECURITY / ERROR CASES
+#######################################################################
+
+### Missing token -> should be 401
+# @name MissingToken401
+GET {{url}}/calc/calculations
+
+> {% client.test("Missing token => 401", () => client.assert(response.status === 401)); %}
+
+### Invalid token -> should be 401
+# @name InvalidToken401
+GET {{url}}/calc/calculations
+Authorization: Bearer totally.invalid.token
+
+> {% client.test("Invalid token => 401", () => client.assert(response.status === 401)); %}
+
+
+
+#######################################################################
+# ADMIN CLEANUP: delete the guest calc we created above (id captured)
+#######################################################################
+
+### Admin deletes guest calc by id (200 if exists, 404 if fallback 0)
+# @name AdminDeleteGuestCalc
+DELETE {{url}}/calc/calculations/{{calc_id}}
+Authorization: Bearer {{admin_token}}
+
+> {% client.test("Admin can delete guest calc (or 404 if id=0)", () => client.assert([200,404].includes(response.status))); %}

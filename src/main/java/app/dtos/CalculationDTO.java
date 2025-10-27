@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-
+import com.fasterxml.jackson.annotation.JsonFormat;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -16,6 +16,7 @@ public class CalculationDTO {
     private double num2;
     private double result;
     private String operation;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime timestamp;
     private String username;
 

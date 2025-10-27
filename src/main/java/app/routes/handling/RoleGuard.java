@@ -1,4 +1,4 @@
-package app.security.controllers;
+package app.routes.handling;
 
 import app.security.enums.Role;
 import io.javalin.http.Context;

@@ -1,6 +1,5 @@
-package app.routes;
+package app.routes.handling;
 
-import app.security.controllers.RoleGuard;
 import app.security.enums.Role;
 import io.javalin.apibuilder.ApiBuilder;
 import io.javalin.apibuilder.EndpointGroup;
@@ -44,7 +43,7 @@ public final class RouteDocs {
         return ctx -> { RoleGuard.require(ctx, roles); h.handle(ctx); };
     }
 
-    // --- DSL wrappers (use these via: import static app.routes.RouteDocs.*;) ---
+    // --- DSL wrappers (use these via: import static app.routes.handling.RouteDocs.*;) ---
     public static void path(String path, EndpointGroup group) {
         String normalized = path.startsWith("/") ? path : "/" + path;
         PREFIX.push(normalized);
@@ -76,6 +75,7 @@ public final class RouteDocs {
     public static Handler overviewHtml = ctx -> {
         final String ctxBase = Optional.ofNullable(ctx.contextPath()).orElse(""); // "/api"
 
+
         // Sort by path, then by method
         List<RouteEntry> routes = ROUTES.stream()
                 .sorted(Comparator.comparing(RouteEntry::path).thenComparing(RouteEntry::method))
@@ -96,6 +96,18 @@ public final class RouteDocs {
     --role-admin:#ef4444; --role-guest:#06b6d4; --role-anyone:#9ca3af;
     --accent:#6ee7b7;
   }
+  td a {
+                    color: inherit;
+                    text-decoration: none;
+                  }
+                  td a:visited {
+                    color: inherit;
+                  }
+                  td a:hover,
+                  td a:focus {
+                    text-decoration: none;
+                    filter: brightness(1.05); /* subtle hint it’s clickable */
+                  }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial}
   .container{max-width:1100px;margin:32px auto;padding:0 16px}
@@ -159,26 +171,61 @@ public final class RouteDocs {
     <footer>Showing <span class="count" id="count">__COUNT__</span> routes</footer>
   </div>
 
-<script>
-  const q = document.getElementById('q');
-  const rows = Array.from(document.querySelectorAll('#routes tbody tr'));
-  const count = document.getElementById('count');
-
-  const filter = () => {
-    const term = (q.value || '').trim().toLowerCase();
-    let visible = 0;
-    for (const tr of rows) {
-      const hay =
-        (tr.dataset.path + ' ' + tr.dataset.method + ' ' + tr.dataset.roles).toLowerCase();
-      const show = !term || hay.includes(term);
-      tr.style.display = show ? '' : 'none';
-      if (show) visible++;
-    }
-    count.textContent = visible;
-  };
-
-  q.addEventListener('input', filter);
-</script>
+                <script>
+                           // Elements
+                           const q = document.getElementById('q');
+                           const table = document.getElementById('routes');
+                           const theadCells = table.querySelectorAll('thead th');
+                           const tbody = table.querySelector('tbody');
+                           let rows = Array.from(tbody.querySelectorAll('tr'));
+                           const count = document.getElementById('count');
+                
+                           // --- Filtering (unchanged) ---
+                           const filter = () => {
+                             const term = (q.value || '').trim().toLowerCase();
+                             let visible = 0;
+                             for (const tr of rows) {
+                               const hay = (tr.dataset.path + ' ' + tr.dataset.method + ' ' + tr.dataset.roles).toLowerCase();
+                               const show = !term || hay.includes(term);
+                               tr.style.display = show ? '' : 'none';
+                               if (show) visible++;
+                             }
+                             count.textContent = visible;
+                           };
+                           q.addEventListener('input', filter);
+                
+                           // --- Sorting ---
+                           // extractors for the three columns
+                           const extract = {
+                             method: tr => (tr.dataset.method || '').toUpperCase(),
+                             path:   tr => (tr.dataset.path   || ''),
+                             roles:  tr => ((tr.dataset.roles || '')
+                                           .split(',').map(s => s.trim()).filter(Boolean).sort().join(',')) // normalize role order
+                           };
+                
+                           // sort state: 1 = ascending, -1 = descending
+                           const state = { method: 1, path: 1, roles: 1 };
+                
+                           function sortBy(key) {
+                             rows.sort((a, b) => {
+                               const A = extract[key](a);
+                               const B = extract[key](b);
+                               if (A < B) return -1 * state[key];
+                               if (A > B) return  1 * state[key];
+                               return 0;
+                             });
+                             state[key] *= -1;          // toggle direction for next click
+                             rows.forEach(r => tbody.appendChild(r)); // reattach in new order
+                             filter();                  // keep current filter active
+                           }
+                
+                           // Make headers clickable
+                           theadCells.forEach(th => th.style.cursor = 'pointer');
+                           // 0 = Method, 1 = Path, 2 = Roles (your table order)
+                           theadCells[0].addEventListener('click', () => sortBy('method'));
+                           theadCells[1].addEventListener('click', () => sortBy('path'));
+                           theadCells[2].addEventListener('click', () => sortBy('roles'));
+                         </script>
 </body>
 </html>
 """;
@@ -199,7 +246,7 @@ public final class RouteDocs {
             html.append("""
         <tr data-path="%s" data-method="%s" data-roles="%s">
           <td><span class="method %s">%s</span></td>
-          <td><code>%s</code></td>
+          <td><a href="%s" target="_blank" rel="noopener"><code>%s</code></a></td>
           <td class="roles">%s</td>
         </tr>
         """.formatted(
@@ -207,7 +254,8 @@ public final class RouteDocs {
                     esc(r.method()),
                     esc(String.join(",", r.roles())),
                     esc(r.method()), esc(r.method()),
-                    esc(fullPathShown),
+                    esc(fullPathShown),           // link target
+                    esc(fullPathShown),           // visible text
                     roleBadges
             ));
         }
