@@ -12,16 +12,23 @@ public class AdminController {
     public AdminController(EntityManagerFactory emf) {
         this.userService = new UserService(emf);
     }
-    public final Handler users = ctx -> {
-        var out = userService.getAllUsers().stream()
-                .map(u -> Map.<String, Object>of(
-                        "id", u.getId(),
-                        "username", u.getUsername(),
-                        "role", u.getRole().name()
-                ))
-                .toList();
-        ctx.json(out);
-    };
 
-    public final Handler panel = ctx -> ctx.json(Map.of("ok", true, "msg", "Welcome, admin"));
+    // /api/admin/panel
+    public Handler panel() {
+        return ctx -> ctx.json(Map.of("ok", true, "msg", "Welcome, admin"));
+    }
+
+    // /api/admin/users
+    public Handler users() {
+        return ctx -> {
+            var out = userService.getAllUsers().stream()
+                    .map(u -> Map.<String, Object>of(
+                            "id", u.getId(),
+                            "username", u.getUsername(),
+                            "role", u.getRole().name()
+                    ))
+                    .toList();
+            ctx.json(out);
+        };
+    }
 }
