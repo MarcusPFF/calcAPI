@@ -12,13 +12,19 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
-    public final Handler register;
-    public final Handler login;
 
     public AuthController(EntityManagerFactory emf) {
         this.userService = new UserService(emf);
+    }
 
-        this.register = ctx -> {
+    // /auth/healthcheck
+    public Handler health() {
+        return ctx -> ctx.json(Map.of("msg", "API is up and running"));
+    }
+
+    // /auth/register
+    public Handler register() {
+        return ctx -> {
             Map<String, Object> body = ctx.bodyAsClass(Map.class);
             String username = (String) body.get("username");
             String password = (String) body.get("password");
@@ -29,10 +35,11 @@ public class AuthController {
                 return;
             }
 
-            Role role = Role.GUEST;
+            Role role;
             try {
                 role = Role.valueOf(roleString.toUpperCase());
             } catch (Exception ignored) {
+                role = Role.GUEST;
             }
 
             User user = userService.registerUser(username, password, role);
@@ -42,8 +49,11 @@ public class AuthController {
                     "role", user.getRole().name()
             ));
         };
+    }
 
-        this.login = ctx -> {
+    // /auth/login
+    public Handler login() {
+        return ctx -> {
             Map<String, Object> body = ctx.bodyAsClass(Map.class);
             String username = (String) body.get("username");
             String password = (String) body.get("password");
