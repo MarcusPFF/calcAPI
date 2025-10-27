@@ -36,7 +36,13 @@ public class CalculationDAO implements IDAO<Calculation, Integer> {
     @Override
     public List<Calculation> getAll() {
         try (EntityManager em = emf.createEntityManager()) {
-            return em.createQuery("SELECT c FROM Calculation c", Calculation.class).getResultList();
+            return em.createQuery(
+                    "SELECT DISTINCT c " +
+                            "FROM Calculation c " +
+                            "LEFT JOIN FETCH c.user " +
+                            "ORDER BY c.timestamp DESC",
+                    Calculation.class
+            ).getResultList();
         }
     }
 

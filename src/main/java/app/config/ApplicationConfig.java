@@ -4,9 +4,8 @@ import app.exceptions.ApiException;
 import app.exceptions.NotAuthorizedException;
 import app.exceptions.ValidationException;
 import app.routes.Routes;
-import app.security.controllers.AuthController;
+import app.routes.handling.RouteDocs;
 import app.security.utils.JwtUtil;
-import app.security.controllers.RoleGuard;
 import app.utils.Utils;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
@@ -18,32 +17,35 @@ import org.slf4j.LoggerFactory;
 public class ApplicationConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(ApplicationConfig.class);
-    private static final Routes routes = new Routes();
     private static int counter = 1;
 
     public static void configuration(JavalinConfig config) {
         config.showJavalinBanner = false;
         config.router.contextPath = "/api";
-        // Route list is available at /api/routes
-        config.bundledPlugins.enableRouteOverview("/routes");
+        // (We’re using our own /api/routes overview via RouteDocs; not the built-in plugin)
     }
 
     public static Javalin startServer(int port) {
-        Javalin app = Javalin.create(ApplicationConfig::configuration);
-
+        // Build EMF first (used by route builder)
         EntityManagerFactory emf = HibernateConfig.getEntityManagerFactory();
 
-        // Public auth routes (no token needed)
-        AuthController auth = new AuthController(emf);
-        app.post("/auth/register", auth.register); // -> /api/auth/register
-        app.post("/auth/login", auth.login);       // -> /api/auth/login
+        // Create server and mount the EndpointGroup (Javalin 6 style)
+        Javalin server = Javalin.create(cfg -> {
+            configuration(cfg);
+            cfg.router.apiBuilder(new Routes().api(emf));
+        });
 
-        // JWT check for all other requests
-        app.before(ctx -> {
-            String p = ctx.path(); // includes the /api prefix
+        // Our custom routes overview (public)
+        server.get("/routes", RouteDocs.overviewHtml);
+
+        // Global JWT guard; allow /api/routes and /api/auth/*
+        server.before(ctx -> {
+            // If you enable CORS later, consider allowing OPTIONS here.
+            String p = ctx.path(); // includes contextPath, e.g. /api/...
             boolean isPublic =
                     p.equals("/routes") || p.equals("/api/routes") ||
-                            p.startsWith("/auth/") || p.startsWith("/api/auth/");
+                            p.startsWith("/auth/") || p.startsWith("/api/auth/") ||
+                            p.startsWith("/public/") || p.startsWith("/api/public/");
             if (isPublic) return;
 
             String header = ctx.header("Authorization");
@@ -55,38 +57,31 @@ public class ApplicationConfig {
                 throw NotAuthorizedException.unauthorized("Invalid or expired token");
             }
 
-            // Store claims for later use in handlers
             ctx.attribute("jwt.user", JwtUtil.getUsername(token));
             ctx.attribute("jwt.role", JwtUtil.getRole(token));
         });
 
-        // Admin-only paths
-        app.before("/admin/*", RoleGuard::requireAdmin);
-
-        // App routes (protected by the before filters above)
-        routes.registerAppRoutes(app, emf);
-
-        // Error handling
-        app.exception(ValidationException.class, (e, ctx) ->
+        // Exceptions
+        server.exception(ValidationException.class, (e, ctx) ->
                 ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()))
         );
-        app.exception(NotAuthorizedException.class, (e, ctx) ->
+        server.exception(NotAuthorizedException.class, (e, ctx) ->
                 ctx.status(e.getStatus() == 0 ? 401 : e.getStatus())
                         .json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()))
         );
-        app.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
-        app.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
+        server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
+        server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
 
-        // Simple request log
-        app.after(ApplicationConfig::afterRequest);
+        // Logging
+        server.after(ApplicationConfig::afterRequest);
 
-        app.start(port);
+        server.start(port);
         logger.info("Server started on http://localhost:{}{}", port, "/api");
-        return app;
+        return server;
     }
 
-    public static void stopServer(Javalin app) {
-        app.stop();
+    public static void stopServer(Javalin server) {
+        server.stop();
         logger.info("Server stopped.");
     }
 

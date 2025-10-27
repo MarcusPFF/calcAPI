@@ -3,6 +3,7 @@ package app.services;
 import app.config.HibernateConfig;
 import app.entities.Calculation;
 import app.entities.User;
+import app.exceptions.ValidationException;
 import app.security.enums.Role;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -67,14 +68,14 @@ class CalculationServiceTest {
     }
 
     @Test
-    void divideShouldReturnCorrectResult() {
+    void divideShouldReturnCorrectResult() throws ValidationException {
         Calculation c = calcService.divide(testUser, 10, 2);
         assertEquals(5, c.getResult());
     }
 
     @Test
     void divideShouldThrowExceptionWhenDividingByZero() {
-        assertThrows(ArithmeticException.class, () -> calcService.divide(testUser, 10, 0));
+        assertThrows(ValidationException.class, () -> calcService.divide(testUser, 10, 0));
     }
 
     @Test

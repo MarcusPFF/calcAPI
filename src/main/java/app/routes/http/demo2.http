@@ -1,0 +1,119 @@
+@url = http://localhost:7070/api
+@admin_username = admin
+@guest_username = guest
+@calc_id = 0
+
+### @name Healthcheck
+GET {{url}}/auth/healthcheck
+
+### @name RegisterAdmin
+POST {{url}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{admin_username}}",
+  "password": "secret123",
+  "role": "ADMIN"
+}
+
+### @name LoginAdmin
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{admin_username}}",
+  "password": "secret123"
+}
+
+> {% client.global.set("admin_token", response.body.token); %}
+
+### @name AdminPanel_ShouldBe200
+GET {{url}}/admin/panel
+Authorization: Bearer {{admin_token}}
+
+> {% client.test("Admin can access admin panel", () => {
+        client.assert(response.status === 200, "Expected 200");
+    }); %}
+
+### @name AdminMultiply_ShouldBe200
+POST {{url}}/calc/multiply
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "num1": 6,
+  "num2": 7
+}
+
+> {% client.test("Admin can multiply", () => {
+        client.assert(response.status === 200, "Expected 200");
+    }); %}
+
+### @name RegisterGuest
+POST {{url}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{guest_username}}",
+  "password": "pass123",
+  "role": "GUEST"
+}
+
+### @name LoginGuest
+POST {{url}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{guest_username}}",
+  "password": "pass123"
+}
+
+> {% client.global.set("guest_token", response.body.token); %}
+
+### @name GuestPanel_ShouldBe403
+GET {{url}}/admin/panel
+Authorization: Bearer {{guest_token}}
+
+> {% client.test("Guest is forbidden from admin panel", () => {
+        client.assert(response.status === 403, "Expected 403");
+    }); %}
+
+### @name GuestAdd_ShouldBe200_AndCaptureCalcId
+POST {{url}}/calc/add
+Authorization: Bearer {{guest_token}}
+Content-Type: application/json
+
+{
+  "num1": 2,
+  "num2": 5
+}
+
+> {%
+    client.test("Guest can add", () => {
+        client.assert(response.status === 200, "Expected 200");
+    });
+    const id = response.body && response.body.id ? String(response.body.id) : "0";
+    client.global.set("calc_id", id);
+%}
+
+### @name GuestMultiply_ShouldBe403
+POST {{url}}/calc/multiply
+Authorization: Bearer {{guest_token}}
+Content-Type: application/json
+
+{
+  "num1": 3,
+  "num2": 3
+}
+
+> {% client.test("Guest is forbidden to multiply", () => {
+        client.assert(response.status === 403, "Expected 403");
+    }); %}
+
+### @name AdminDeleteGuestCalc_200or404
+DELETE {{url}}/calc/calculations/{{calc_id}}
+Authorization: Bearer {{admin_token}}
+
+> {% client.test("Admin can delete calculation (or 404 if none)", () => {
+        client.assert([200, 404].includes(response.status), "Expected 200 or 404");
+    }); %}

@@ -21,16 +21,6 @@ public class DTOMapper {
     }
 
     public static CalculationDTO toCalculationDTO(Calculation calc) {
-        if (calc == null) return null;
-        String username = calc.getUser() != null ? calc.getUser().getUsername() : null;
-        return new CalculationDTO(
-                calc.getId(),
-                calc.getNum1(),
-                calc.getNum2(),
-                calc.getResult(),
-                calc.getOperation(),
-                calc.getTimestamp(),
-                username
-        );
+        return (calc == null) ? null : new CalculationDTO(calc);
     }
 }

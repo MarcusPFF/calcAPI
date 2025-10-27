@@ -82,7 +82,8 @@ public class HibernateConfig {
     private static Properties setBaseProperties(Properties props) {
         props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
         props.put("hibernate.connection.driver_class", "org.postgresql.Driver");
-        props.put("hibernate.hbm2ddl.auto", "create");
+        //CHANGE HERE
+      //  props.put("hibernate.hbm2ddl.auto", "create");
         props.put("hibernate.current_session_context_class", "thread");
         props.put("hibernate.show_sql", "false");
         props.put("hibernate.format_sql", "false");
@@ -95,6 +96,9 @@ public class HibernateConfig {
         props.setProperty("hibernate.connection.url", System.getenv("CONNECTION_STR") + DBName);
         props.setProperty("hibernate.connection.username", System.getenv("DB_USERNAME"));
         props.setProperty("hibernate.connection.password", System.getenv("DB_PASSWORD"));
+
+        props.put("hibernate.hbm2ddl.auto", "update");
+
         return props;
     }
 
