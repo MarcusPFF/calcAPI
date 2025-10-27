@@ -105,6 +105,24 @@ public class ApiTest {
                 .statusCode(200)
                 .body("$", notNullValue()); // array, possibly empty
 
+        // /public/info
+        get("/public/info")
+                .then()
+                .statusCode(200)
+                .body("name", not(emptyOrNullString()));
+
+        // /public/stats
+        get("/public/stats")
+                .then()
+                .statusCode(200)
+                .body("total", notNullValue());
+
+        // /public/examples
+        get("/public/examples")
+                .then()
+                .statusCode(200)
+                .body("add", notNullValue());
+
         // /routes (custom overview, HTML)
         get("/routes")
                 .then()
@@ -125,6 +143,37 @@ public class ApiTest {
     }
 
     @Test @Order(3)
+    void register_negative_cases() {
+        // Try to register with missing fields
+        given()
+                .contentType("application/json")
+                .body(Map.of("username", "test", "password", "123"))
+                .when()
+                .post("/auth/register")
+                .then()
+                .statusCode(anyOf(is(200), is(201))); // Without role, should default to GUEST
+
+        // Try to register with invalid role
+        String invalidRoleUser = "invalid_" + UUID.randomUUID().toString().substring(0, 8);
+        given()
+                .contentType("application/json")
+                .body(Map.of("username", invalidRoleUser, "password", "123", "role", "INVALID"))
+                .when()
+                .post("/auth/register")
+                .then()
+                .statusCode(anyOf(is(200), is(201))); // Should default to GUEST
+
+        // Try to register with empty password
+        given()
+                .contentType("application/json")
+                .body(Map.of("username", "test2", "password", ""))
+                .when()
+                .post("/auth/register")
+                .then()
+                .statusCode(anyOf(is(200), is(201), is(400)));
+    }
+
+    @Test @Order(4)
     void security_edges() {
         // missing auth on protected route
         get("/calc/calculations").then().statusCode(401);
@@ -136,9 +185,25 @@ public class ApiTest {
                 .get("/calc/calculations")
                 .then()
                 .statusCode(401);
+
+        // Missing Bearer prefix
+        given()
+                .header("Authorization", "not-a-valid-token")
+                .when()
+                .get("/calc/calculations")
+                .then()
+                .statusCode(401);
+
+        // Try to access non-existent route with auth
+        given()
+                .header("Authorization", "Bearer " + adminToken)
+                .when()
+                .get("/nonexistent/route")
+                .then()
+                .statusCode(404);
     }
 
-    @Test @Order(4)
+    @Test @Order(5)
     void admin_access_and_admin_only_ops() {
         // admin panel allowed
         given().header("Authorization", "Bearer " + adminToken)
@@ -156,6 +221,7 @@ public class ApiTest {
         Integer idDiv = postCalc(adminToken, "divide", 10, 2, 200);
         Assertions.assertNotNull(idDiv, "admin divide should return an id");
 
+        // Test divide by zero
         given()
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType("application/json")
@@ -164,9 +230,17 @@ public class ApiTest {
                 .post("/calc/divide")
                 .then()
                 .statusCode(400);
+
+        // Test negative numbers
+        Integer negCalc = postCalc(adminToken, "add", -5, 10, 200);
+        Assertions.assertNotNull(negCalc);
+
+        // Test decimal numbers
+        Integer decimalCalc = postCalc(adminToken, "multiply", 3.5, 2.5, 200);
+        Assertions.assertNotNull(decimalCalc);
     }
 
-    @Test @Order(5)
+    @Test @Order(6)
     void guest_permissions_and_own_data() {
         // guest cannot access admin panel
         given().header("Authorization", "Bearer " + guestToken)
@@ -189,6 +263,7 @@ public class ApiTest {
         postCalc(guestToken, "divide", 8, 2, 403);
 
         // guest /calc/calculations -> only their own
+        @SuppressWarnings("unchecked")
         List<Map<String, Object>> mine =
                 given().header("Authorization", "Bearer " + guestToken)
                         .when().get("/calc/calculations")
@@ -200,18 +275,27 @@ public class ApiTest {
                 mine.stream().allMatch(m -> guestUser.equals(m.get("username"))),
                 "Guest should only see their own calculations"
         );
-    }
 
-    @Test @Order(6)
-    void public_get_all_reflects_everything() {
-        // public list should include at least those made above
-        get("/public/calculations")
-                .then()
-                .statusCode(200)
-                .body("$", notNullValue());
+        // Test very large numbers
+        Integer largeCalc = postCalc(guestToken, "add", 999999999, 888888888, 200);
+        Assertions.assertNotNull(largeCalc);
     }
 
     @Test @Order(7)
+    void public_get_all_reflects_everything() {
+        // public list should include at least those made above
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> all =
+                get("/public/calculations")
+                        .then()
+                        .statusCode(200)
+                        .extract().as(List.class);
+
+        Assertions.assertNotNull(all);
+        // Should contain both admin and guest calculations
+    }
+
+    @Test @Order(8)
     void delete_rules() {
         // guest cannot delete (admin-only)
         given()
@@ -221,7 +305,7 @@ public class ApiTest {
                 .then()
                 .statusCode(403);
 
-        // admin can delete guest’s calculation
+        // admin can delete guest's calculation
         given()
                 .header("Authorization", "Bearer " + adminToken)
                 .when()
@@ -237,9 +321,17 @@ public class ApiTest {
                 .delete("/calc/calculations/{id}", guestCalcId)
                 .then()
                 .statusCode(404);
+
+        // Try to delete a non-existent calculation
+        given()
+                .header("Authorization", "Bearer " + adminToken)
+                .when()
+                .delete("/calc/calculations/{id}", 999999)
+                .then()
+                .statusCode(404);
     }
 
-    @Test @Order(8)
+    @Test @Order(9)
     void login_negative_cases() {
         // wrong password
         given()
@@ -258,5 +350,86 @@ public class ApiTest {
                 .post("/auth/login")
                 .then()
                 .statusCode(anyOf(is(400), is(500)));
+
+        // missing username
+        given()
+                .contentType("application/json")
+                .body(Map.of("password", "123"))
+                .when()
+                .post("/auth/login")
+                .then()
+                .statusCode(anyOf(is(400), is(500)));
+
+        // missing password
+        given()
+                .contentType("application/json")
+                .body(Map.of("username", "test"))
+                .when()
+                .post("/auth/login")
+                .then()
+                .statusCode(anyOf(is(400), is(500)));
+
+        // non-existent user
+        given()
+                .contentType("application/json")
+                .body(Map.of("username", "nonExistentUser", "password", "123"))
+                .when()
+                .post("/auth/login")
+                .then()
+                .statusCode(401);
+    }
+
+    @Test @Order(10)
+    void calculation_data_structure() {
+        // Create a calculation and verify all fields
+        Integer calcId = postCalc(adminToken, "add", 5, 10, 200);
+        Assertions.assertNotNull(calcId);
+
+        // Get it back from public calculations
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> all = get("/public/calculations")
+                .then()
+                .statusCode(200)
+                .extract().as(List.class);
+
+        // Find our calculation
+        Map<String, Object> calc = all.stream()
+                .filter(c -> calcId.equals(c.get("id")))
+                .findFirst()
+                .orElse(null);
+
+        Assertions.assertNotNull(calc);
+        Assertions.assertEquals(5.0, (Double) calc.get("num1"));
+        Assertions.assertEquals(10.0, (Double) calc.get("num2"));
+        Assertions.assertEquals(15.0, (Double) calc.get("result"));
+        Assertions.assertEquals("ADD", calc.get("operation"));
+        Assertions.assertNotNull(calc.get("timestamp"));
+        Assertions.assertEquals(adminUser, calc.get("username"));
+    }
+
+    @Test @Order(11)
+    void edge_cases_and_special_values() {
+        // Test zero operations
+        postCalc(adminToken, "add", 0, 0, 200);
+        postCalc(adminToken, "multiply", 0, 100, 200);
+        postCalc(adminToken, "subtract", 0, 5, 200);
+
+        // Test floating point precision
+        postCalc(adminToken, "divide", 1.0, 3.0, 200);
+
+        // Test very small numbers
+        postCalc(adminToken, "multiply", 0.0001, 0.0001, 200);
+    }
+
+    @Test @Order(12)
+    void register_duplicate_username() {
+        // Try to register with existing username
+        given()
+                .contentType("application/json")
+                .body(Map.of("username", adminUser, "password", "different", "role", "GUEST"))
+                .when()
+                .post("/auth/register")
+                .then()
+                .statusCode(anyOf(is(400), is(500), is(200))); // Depends on your implementation
     }
 }

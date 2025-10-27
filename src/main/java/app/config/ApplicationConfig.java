@@ -21,47 +21,49 @@ public class ApplicationConfig {
 
     public static void configuration(JavalinConfig config) {
         config.showJavalinBanner = false;
-        config.router.contextPath = "/api";
-        // (We’re using our own /api/routes overview via RouteDocs; not the built-in plugin)
+        config.router.contextPath = "/api"; // min base-path
     }
 
     public static Javalin startServer(int port) {
-        // Build EMF first (used by route builder)
         EntityManagerFactory emf = HibernateConfig.getEntityManagerFactory();
 
-        // Create server and mount the EndpointGroup (Javalin 6 style)
         Javalin server = Javalin.create(cfg -> {
             configuration(cfg);
             cfg.router.apiBuilder(new Routes().api(emf));
         });
 
-        // Our custom routes overview (public)
+        // offentlig rute-oversigt + redirect fra /
         server.get("/routes", RouteDocs.overviewHtml);
+        server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
-        // Global JWT guard; allow /api/routes and /api/auth/*
+        // global jwt-guard (alt der ikke er offentligt, kræver token)
         server.before(ctx -> {
-            // If you enable CORS later, consider allowing OPTIONS here.
-            String p = ctx.path(); // includes contextPath, e.g. /api/...
+            if ("OPTIONS".equals(ctx.method())) return; // preflight må gerne slippe igennem
+
+            String base = ctx.contextPath(); // fx "/api"
+            String p = ctx.path();            // fx "/api/..."
+
             boolean isPublic =
-                    p.equals("/routes") || p.equals("/api/routes") ||
-                            p.startsWith("/auth/") || p.startsWith("/api/auth/") ||
-                            p.startsWith("/public/") || p.startsWith("/api/public/");
+                    p.equals(base + "/") ||
+                            p.equals(base + "/routes") ||
+                            p.startsWith(base + "/auth/") ||
+                            p.startsWith(base + "/public/");
+
             if (isPublic) return;
 
             String header = ctx.header("Authorization");
-            if (header == null || !header.startsWith("Bearer ")) {
+            if (header == null || !header.startsWith("Bearer "))
                 throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
-            }
+
             String token = header.substring("Bearer ".length()).trim();
-            if (!JwtUtil.validateToken(token)) {
+            if (!JwtUtil.validateToken(token))
                 throw NotAuthorizedException.unauthorized("Invalid or expired token");
-            }
 
             ctx.attribute("jwt.user", JwtUtil.getUsername(token));
             ctx.attribute("jwt.role", JwtUtil.getRole(token));
         });
 
-        // Exceptions
+        // central fejlhåndtering
         server.exception(ValidationException.class, (e, ctx) ->
                 ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()))
         );
@@ -72,7 +74,7 @@ public class ApplicationConfig {
         server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
         server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
 
-        // Logging
+        // simpel request-logging
         server.after(ApplicationConfig::afterRequest);
 
         server.start(port);
@@ -81,8 +83,10 @@ public class ApplicationConfig {
     }
 
     public static void stopServer(Javalin server) {
-        server.stop();
-        logger.info("Server stopped.");
+        if (server != null) {
+            server.stop(); // stop roligt
+            logger.info("Server stopped.");
+        }
     }
 
     private static void afterRequest(Context ctx) {

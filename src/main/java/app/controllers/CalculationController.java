@@ -76,7 +76,7 @@ public class CalculationController {
 
         this.deleteById = ctx -> {
             long id = Long.parseLong(ctx.pathParam("id"));
-            calcService.deleteById((int) id); // or long, match your @Id type
+            calcService.deleteById((int) id);
             ctx.json(java.util.Map.of("deletedId", id));
         };
     }
