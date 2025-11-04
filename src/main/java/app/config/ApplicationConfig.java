@@ -33,7 +33,6 @@ public class ApplicationConfig {
             cfg.bundledPlugins.enableCors(cors -> {
                 cors.addRule(rule -> {
                     rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com", "http://localhost:7070");
-                    rule.exposeHeader("*");
                 });
             });
 
@@ -41,7 +40,15 @@ public class ApplicationConfig {
         });
 
         // Offentlige endpoints
-        server.get("/routes", RouteDocs.overviewHtml);
+        server.get("/routes", ctx -> {
+            String accept = String.valueOf(ctx.header("Accept")).toLowerCase();
+            if (accept.contains("application/json") || "json".equals(ctx.queryParam("format"))) {
+                ctx.contentType("application/json");
+                ctx.json(RouteDocs.overviewJson());
+            } else {
+                RouteDocs.overviewHtml.handle(ctx);
+            }
+        });
         server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
         //Global JWT GUARD
