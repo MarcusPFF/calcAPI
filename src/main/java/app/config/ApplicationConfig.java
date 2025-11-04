@@ -3,7 +3,6 @@ package app.config;
 import app.exceptions.ApiException;
 import app.exceptions.NotAuthorizedException;
 import app.exceptions.ValidationException;
-import app.routes.Routes;
 import app.routes.handling.RouteDocs;
 import app.security.utils.JwtUtil;
 import app.utils.Utils;
@@ -30,81 +29,71 @@ public class ApplicationConfig {
         Javalin server = Javalin.create(cfg -> {
             configuration(cfg);
 
-            boolean isProd = "prod".equalsIgnoreCase(System.getenv("APP_ENV"));
-
             cfg.bundledPlugins.enableCors(cors -> {
                 cors.addRule(rule -> {
-                    if (isProd) {
-                        rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com");
-                    } else {
-                        rule.allowHost(
-                                "http://localhost:8080"
-                        );
-                    }
+                    rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com", "http://localhost:8080");
                     rule.exposeHeader("*");
-
                 });
             });
-            cfg.router.apiBuilder(new Routes().api(emf));
-        });
 
-        server.get("/routes", RouteDocs.overviewHtml);
-        server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
+            server.get("/routes", RouteDocs.overviewHtml);
+            server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
-        //Global JWT GUARD
-        server.before(ctx -> {
-            if ("OPTIONS".equals(ctx.method())) return;
+            //Global JWT GUARD
+            server.before(ctx -> {
+                if ("OPTIONS".equals(ctx.method())) return;
 
-            String base = ctx.contextPath();
-            String p = ctx.path();
+                String base = ctx.contextPath();
+                String p = ctx.path();
 
-            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/");
+                boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/");
 
-            if (isPublic) return;
+                if (isPublic) return;
 
-            String header = ctx.header("Authorization");
-            if (header == null || !header.startsWith("Bearer "))
-                throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
+                String header = ctx.header("Authorization");
+                if (header == null || !header.startsWith("Bearer "))
+                    throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
 
-            String token = header.substring("Bearer ".length()).trim();
-            if (!JwtUtil.validateToken(token)) throw NotAuthorizedException.unauthorized("Invalid or expired token");
+                String token = header.substring("Bearer ".length()).trim();
+                if (!JwtUtil.validateToken(token))
+                    throw NotAuthorizedException.unauthorized("Invalid or expired token");
 
-            ctx.attribute("jwt.user", JwtUtil.getUsername(token));
-            ctx.attribute("jwt.role", JwtUtil.getRole(token));
-        });
+                ctx.attribute("jwt.user", JwtUtil.getUsername(token));
+                ctx.attribute("jwt.role", JwtUtil.getRole(token));
+            });
 
-        server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
-        server.exception(NotAuthorizedException.class, (e, ctx) -> ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
-        server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
-        server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
+            server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+            server.exception(NotAuthorizedException.class, (e, ctx) -> ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+            server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
+            server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
 
-        server.after(ApplicationConfig::afterRequest);
+            server.after(ApplicationConfig::afterRequest);
 
-        server.start(port);
-        logger.info("Server started on http://localhost:{}{}", port, "/api");
-        return server;
-    }
+            server.start(port);
+            logger.info("Server started on http://localhost:{}{}", port, "/api");
+            return server;
+        }
 
-    public static void stopServer(Javalin server) {
-        if (server != null) {
-            server.stop();
-            logger.info("Server stopped.");
+        public static void stopServer (Javalin server){
+            if (server != null) {
+                server.stop();
+                logger.info("Server stopped.");
+            }
+        }
+
+        private static void afterRequest (Context ctx){
+            String info = ctx.method() + " " + ctx.path();
+            logger.info("Request {} - {} -> {}", counter++, info, ctx.status());
+        }
+
+        private static void generalExceptionHandler (Exception e, Context ctx){
+            logger.error("Unhandled exception", e);
+            ctx.status(500).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()));
+        }
+
+        public static void apiExceptionHandler (ApiException e, Context ctx){
+            ctx.status(e.getStatusCode());
+            logger.warn("API exception {}: {}", e.getStatusCode(), e.getMessage());
+            ctx.json(Utils.convertToJsonMessage(ctx, "warning", e.getMessage()));
         }
     }
-
-    private static void afterRequest(Context ctx) {
-        String info = ctx.method() + " " + ctx.path();
-        logger.info("Request {} - {} -> {}", counter++, info, ctx.status());
-    }
-
-    private static void generalExceptionHandler(Exception e, Context ctx) {
-        logger.error("Unhandled exception", e);
-        ctx.status(500).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()));
-    }
-
-    public static void apiExceptionHandler(ApiException e, Context ctx) {
-        ctx.status(e.getStatusCode());
-        logger.warn("API exception {}: {}", e.getStatusCode(), e.getMessage());
-        ctx.json(Utils.convertToJsonMessage(ctx, "warning", e.getMessage()));
-    }
-}
