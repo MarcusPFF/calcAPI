@@ -102,7 +102,6 @@ public final class RouteDocs {
     public static Handler overviewHtml = ctx -> {
         final String ctxBase = Optional.ofNullable(ctx.contextPath()).orElse(""); // "/api"
 
-
         // Sort by path, then by method
         List<RouteEntry> routes = ROUTES.stream()
                 .sorted(Comparator.comparing(RouteEntry::path).thenComparing(RouteEntry::method))
