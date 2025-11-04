@@ -29,6 +29,22 @@ public class ApplicationConfig {
 
         Javalin server = Javalin.create(cfg -> {
             configuration(cfg);
+
+            boolean isProd = "prod".equalsIgnoreCase(System.getenv("APP_ENV"));
+
+            cfg.bundledPlugins.enableCors(cors -> {
+                cors.addRule(rule -> {
+                    if (isProd) {
+                        rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com");
+                    } else {
+                        rule.allowHost(
+                                "http://localhost:8080"
+                        );
+                    }
+                    rule.exposeHeader("*");
+
+                });
+            });
             cfg.router.apiBuilder(new Routes().api(emf));
         });
 
