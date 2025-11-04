@@ -3,6 +3,7 @@ package app.config;
 import app.exceptions.ApiException;
 import app.exceptions.NotAuthorizedException;
 import app.exceptions.ValidationException;
+import app.routes.Routes;
 import app.routes.handling.RouteDocs;
 import app.security.utils.JwtUtil;
 import app.utils.Utils;
@@ -36,64 +37,67 @@ public class ApplicationConfig {
                 });
             });
 
-            server.get("/routes", RouteDocs.overviewHtml);
-            server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
+            cfg.router.apiBuilder(new Routes().api(emf));
+        });
 
-            //Global JWT GUARD
-            server.before(ctx -> {
-                if ("OPTIONS".equals(ctx.method())) return;
+        // Offentlige endpoints
+        server.get("/routes", RouteDocs.overviewHtml);
+        server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
-                String base = ctx.contextPath();
-                String p = ctx.path();
+        //Global JWT GUARD
+        server.before(ctx -> {
+            if ("OPTIONS".equals(ctx.method())) return;
 
-                boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/");
+            String base = ctx.contextPath();
+            String p = ctx.path();
 
-                if (isPublic) return;
+            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/");
 
-                String header = ctx.header("Authorization");
-                if (header == null || !header.startsWith("Bearer "))
-                    throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
+            if (isPublic) return;
 
-                String token = header.substring("Bearer ".length()).trim();
-                if (!JwtUtil.validateToken(token))
-                    throw NotAuthorizedException.unauthorized("Invalid or expired token");
+            String header = ctx.header("Authorization");
+            if (header == null || !header.startsWith("Bearer "))
+                throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
 
-                ctx.attribute("jwt.user", JwtUtil.getUsername(token));
-                ctx.attribute("jwt.role", JwtUtil.getRole(token));
-            });
+            String token = header.substring("Bearer ".length()).trim();
+            if (!JwtUtil.validateToken(token)) throw NotAuthorizedException.unauthorized("Invalid or expired token");
 
-            server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
-            server.exception(NotAuthorizedException.class, (e, ctx) -> ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
-            server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
-            server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
+            ctx.attribute("jwt.user", JwtUtil.getUsername(token));
+            ctx.attribute("jwt.role", JwtUtil.getRole(token));
+        });
 
-            server.after(ApplicationConfig::afterRequest);
+        server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+        server.exception(NotAuthorizedException.class, (e, ctx) -> ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+        server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
+        server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
 
-            server.start(port);
-            logger.info("Server started on http://localhost:{}{}", port, "/api");
-            return server;
-        }
+        server.after(ApplicationConfig::afterRequest);
 
-        public static void stopServer (Javalin server){
-            if (server != null) {
-                server.stop();
-                logger.info("Server stopped.");
-            }
-        }
+        server.start(port);
+        logger.info("Server started on http://localhost:{}{}", port, "/api");
+        return server;
+    }
 
-        private static void afterRequest (Context ctx){
-            String info = ctx.method() + " " + ctx.path();
-            logger.info("Request {} - {} -> {}", counter++, info, ctx.status());
-        }
-
-        private static void generalExceptionHandler (Exception e, Context ctx){
-            logger.error("Unhandled exception", e);
-            ctx.status(500).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()));
-        }
-
-        public static void apiExceptionHandler (ApiException e, Context ctx){
-            ctx.status(e.getStatusCode());
-            logger.warn("API exception {}: {}", e.getStatusCode(), e.getMessage());
-            ctx.json(Utils.convertToJsonMessage(ctx, "warning", e.getMessage()));
+    public static void stopServer(Javalin server) {
+        if (server != null) {
+            server.stop();
+            logger.info("Server stopped.");
         }
     }
+
+    private static void afterRequest(Context ctx) {
+        String info = ctx.method() + " " + ctx.path();
+        logger.info("Request {} - {} -> {}", counter++, info, ctx.status());
+    }
+
+    private static void generalExceptionHandler(Exception e, Context ctx) {
+        logger.error("Unhandled exception", e);
+        ctx.status(500).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage()));
+    }
+
+    public static void apiExceptionHandler(ApiException e, Context ctx) {
+        ctx.status(e.getStatusCode());
+        logger.warn("API exception {}: {}", e.getStatusCode(), e.getMessage());
+        ctx.json(Utils.convertToJsonMessage(ctx, "warning", e.getMessage()));
+    }
+}
