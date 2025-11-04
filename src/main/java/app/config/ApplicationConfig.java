@@ -32,7 +32,7 @@ public class ApplicationConfig {
 
             cfg.bundledPlugins.enableCors(cors -> {
                 cors.addRule(rule -> {
-                    rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com", "http://localhost:8080");
+                    rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com", "http://localhost:7070");
                     rule.exposeHeader("*");
                 });
             });
