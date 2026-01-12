@@ -56,6 +56,7 @@ public class ApplicationConfig {
         server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
         // Global JWT GUARD
+        // Global JWT GUARD
         server.before(ctx -> {
             if ("OPTIONS".equals(ctx.method())) return;
 
@@ -72,16 +73,26 @@ public class ApplicationConfig {
 
             String header = ctx.header("Authorization");
 
+            // 2. Scenario A: User HAS a Token (Admin/User)
             if (header != null && header.startsWith("Bearer ")) {
                 String token = header.substring("Bearer ".length()).trim();
                 if (!JwtUtil.validateToken(token)) throw NotAuthorizedException.unauthorized("Invalid or expired token");
 
+                // Assign their REAL role from the token
                 ctx.attribute("jwt.user", JwtUtil.getUsername(token));
                 ctx.attribute("jwt.role", JwtUtil.getRole(token));
-            } else if (!isPublic) {
+            }
+            // 3. Scenario B: User is Public (Guest) with NO Token
+            else if (isPublic) {
+                // GIVE THEM A GUEST BADGE!
+                // This prevents "Missing role" errors in the controller
+                ctx.attribute("jwt.user", "guest");
+                ctx.attribute("jwt.role", "guest"); // or "any", depending on your Enum
+            }
+            // 4. Scenario C: Private Route + No Token = BLOCK
+            else {
                 throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
             }
-
         });
 
         server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
