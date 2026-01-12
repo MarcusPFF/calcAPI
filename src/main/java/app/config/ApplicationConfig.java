@@ -87,7 +87,7 @@ public class ApplicationConfig {
                 // GIVE THEM A GUEST BADGE!
                 // This prevents "Missing role" errors in the controller
                 ctx.attribute("jwt.user", "guest");
-                ctx.attribute("jwt.role", "guest"); // or "any", depending on your Enum
+                ctx.attribute("jwt.role", "GUEST"); // or "any", depending on your Enum
             }
             // 4. Scenario C: Private Route + No Token = BLOCK
             else {
