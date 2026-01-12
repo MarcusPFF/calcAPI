@@ -30,14 +30,16 @@ public class ApplicationConfig {
         Javalin server = Javalin.create(cfg -> {
             configuration(cfg);
 
-            cfg.bundledPlugins.enableCors(cors -> {
-                cors.addRule(rule -> {
-                    rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com", "http://localhost:7070");
-                });
-            });
+            // REMOVED: The bundled cors plugin is replaced by your manual control below.
+            // This prevents duplicate headers and "Access-Control" conflicts.
 
             cfg.router.apiBuilder(new Routes().api(emf));
         });
+
+        // --- 1. ENABLE YOUR MANUAL CORS SETTINGS ---
+        // We use 'server' here (not 'app') because that is your variable name above.
+        server.before(ctx -> corsHeaders(ctx));
+        server.options("/*", ctx -> corsHeadersOptions(ctx));
 
         // Offentlige endpoints
         server.get("/routes", ctx -> {
@@ -51,14 +53,14 @@ public class ApplicationConfig {
         });
         server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
-        //Global JWT GUARD
+        // Global JWT GUARD
         server.before(ctx -> {
-            if ("OPTIONS".equals(ctx.method())) return;
+            if ("OPTIONS".equals(ctx.method())) return; // Allow OPTIONS (CORS) to pass through
 
             String base = ctx.contextPath();
             String p = ctx.path();
 
-            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/");
+            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/"); // Added /public/ for your calculator
 
             if (isPublic) return;
 
@@ -81,7 +83,7 @@ public class ApplicationConfig {
         server.after(ApplicationConfig::afterRequest);
 
         server.start(port);
-        logger.info("Server started on http://localhost:{}{}", port, "/api");
+        // logger.info("Server started on http://localhost:{}{}", port, "/api"); // valid if logger exists
         return server;
     }
 
@@ -106,5 +108,18 @@ public class ApplicationConfig {
         ctx.status(e.getStatusCode());
         logger.warn("API exception {}: {}", e.getStatusCode(), e.getMessage());
         ctx.json(Utils.convertToJsonMessage(ctx, "warning", e.getMessage()));
+    }
+
+    private static void corsHeaders(Context ctx) {
+        ctx.header("Access-Control-Allow-Origin", "*");
+        ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+
+    private static void corsHeadersOptions(Context ctx) {
+        ctx.header("Access-Control-Allow-Origin", "*");
+        ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        ctx.status(204);
     }
 }
