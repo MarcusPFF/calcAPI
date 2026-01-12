@@ -2,7 +2,6 @@ package app.controllers;
 
 import app.dtos.DTOMapper;
 import app.entities.User;
-import app.security.Role;
 import app.services.CalculationService;
 import app.services.UserService;
 import io.javalin.http.Handler;
@@ -40,7 +39,7 @@ public class CalculationController {
         return ctx -> {
             CalcReq body = ctx.bodyAsClass(CalcReq.class);
             String username = ctx.attribute("jwt.user");
-            User user = getOrCreateUser(username);
+            User user = userService.getOrCreateGuest(username);
             var saved = calcService.subtract(user, body.num1, body.num2);
             ctx.json(DTOMapper.toCalculationDTO(saved));
         };
@@ -50,7 +49,7 @@ public class CalculationController {
         return ctx -> {
             CalcReq body = ctx.bodyAsClass(CalcReq.class);
             String username = ctx.attribute("jwt.user");
-            User user = getOrCreateUser(username);
+            User user = userService.getOrCreateGuest(username);
             var saved = calcService.multiply(user, body.num1, body.num2);
             ctx.json(DTOMapper.toCalculationDTO(saved));
         };
@@ -60,7 +59,7 @@ public class CalculationController {
         return ctx -> {
             CalcReq body = ctx.bodyAsClass(CalcReq.class);
             String username = ctx.attribute("jwt.user");
-            User user = getOrCreateUser(username);
+            User user = userService.getOrCreateGuest(username);
             var saved = calcService.divide(user, body.num1, body.num2);
             ctx.json(DTOMapper.toCalculationDTO(saved));
         };
