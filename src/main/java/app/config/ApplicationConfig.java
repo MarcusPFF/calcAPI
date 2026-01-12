@@ -62,20 +62,26 @@ public class ApplicationConfig {
             String base = ctx.contextPath();
             String p = ctx.path();
 
-            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/") || p.equals(base + "/calc/add")       // Only unlock ADD
+            // 1. Define Public Routes
+            boolean isPublic = p.equals(base + "/")
+                    || p.equals(base + "/routes")
+                    || p.startsWith(base + "/auth/")
+                    || p.startsWith(base + "/public/")
+                    || p.equals(base + "/calc/add")
                     || p.equals(base + "/calc/subtract");
 
-            if (isPublic) return;
-
             String header = ctx.header("Authorization");
-            if (header == null || !header.startsWith("Bearer "))
+
+            if (header != null && header.startsWith("Bearer ")) {
+                String token = header.substring("Bearer ".length()).trim();
+                if (!JwtUtil.validateToken(token)) throw NotAuthorizedException.unauthorized("Invalid or expired token");
+
+                ctx.attribute("jwt.user", JwtUtil.getUsername(token));
+                ctx.attribute("jwt.role", JwtUtil.getRole(token));
+            } else if (!isPublic) {
                 throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
+            }
 
-            String token = header.substring("Bearer ".length()).trim();
-            if (!JwtUtil.validateToken(token)) throw NotAuthorizedException.unauthorized("Invalid or expired token");
-
-            ctx.attribute("jwt.user", JwtUtil.getUsername(token));
-            ctx.attribute("jwt.role", JwtUtil.getRole(token));
         });
 
         server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
