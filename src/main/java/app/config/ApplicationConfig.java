@@ -62,7 +62,8 @@ public class ApplicationConfig {
             String base = ctx.contextPath();
             String p = ctx.path();
 
-            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/"); // Added /public/ for your calculator
+            boolean isPublic = p.equals(base + "/") || p.equals(base + "/routes") || p.startsWith(base + "/auth/") || p.startsWith(base + "/public/") || p.equals(base + "/calc/add")       // Only unlock ADD
+                    || p.equals(base + "/calc/subtract");
 
             if (isPublic) return;
 
