@@ -16,6 +16,16 @@ public class UserService {
         this.userDAO = new UserDAO(emf);
     }
 
+    public User getOrCreateGuest(String username) {
+        if ("guest".equalsIgnoreCase(username)) {
+            String anonName = "anom_" + (int) (Math.random() * 10000);
+            User anonUser = new User(anonName, "temp123", Role.GUEST);
+            return userDAO.create(anonUser);
+        }
+
+        return findByUsername(username);
+    }
+
     // Register new user and hashes password after that give user GUEST role.
     public User registerUser(String username, String password, Role role) {
         if (userDAO.findByUsername(username) != null) {
