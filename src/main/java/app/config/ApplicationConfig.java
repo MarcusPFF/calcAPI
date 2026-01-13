@@ -5,6 +5,7 @@ import app.exceptions.NotAuthorizedException;
 import app.exceptions.ValidationException;
 import app.routes.Routes;
 import app.routes.handling.RouteDocs;
+import app.security.enums.Role;
 import app.security.utils.JwtUtil;
 import app.utils.Utils;
 import io.javalin.Javalin;
@@ -29,21 +30,19 @@ public class ApplicationConfig {
 
         Javalin server = Javalin.create(cfg -> {
             configuration(cfg);
-
-//            cfg.bundledPlugins.enableCors(cors -> {
-//
-//                cors.addRule(rule -> {
-//
-//                    rule.allowHost("https://marcuspff.com", "https://www.marcuspff.com", "http://localhost:7070");
-//
-//                });
-//
             cfg.router.apiBuilder(new Routes().api(emf));
         });
 
-        server.before(ctx -> corsHeaders(ctx));
-        server.options("/*", ctx -> corsHeadersOptions(ctx));
+        // 1. Handle CORS Preflight Requests (OPTIONS)
+        server.options("/*", ctx -> {
+            corsHeaders(ctx);
+            ctx.status(204);
+        });
 
+        // 2. Add CORS headers to all other responses
+        server.before(ctx -> corsHeaders(ctx));
+
+        // 3. Documentation Routes
         server.get("/routes", ctx -> {
             String accept = String.valueOf(ctx.header("Accept")).toLowerCase();
             if (accept.contains("application/json") || "json".equals(ctx.queryParam("format"))) {
@@ -55,55 +54,57 @@ public class ApplicationConfig {
         });
         server.get("/", ctx -> ctx.redirect(ctx.contextPath() + "/routes"));
 
-        // Global JWT GUARD
-        // Global JWT GUARD
+        // 4. Global Security Guard
         server.before(ctx -> {
-            if ("OPTIONS".equals(ctx.method())) return;
+            // Allow OPTIONS requests to pass through security (Critical for CORS)
+            if (ctx.method().toString().equals("OPTIONS")) return;
 
+            String path = ctx.path();
             String base = ctx.contextPath();
-            String p = ctx.path();
 
-            // 1. Define Public Routes
-            boolean isPublic = p.equals(base + "/")
-                    || p.equals(base + "/routes")
-                    || p.startsWith(base + "/auth/")
-                    || p.startsWith(base + "/public/")
-                    || p.equals(base + "/calc/add")
-                    || p.equals(base + "/calc/subtract");
+            // Check if route is public
+            boolean isPublic = path.equals(base + "/")
+                    || path.equals(base + "/routes")
+                    || path.startsWith(base + "/auth/")
+                    || path.startsWith(base + "/public/")
+                    || path.equals(base + "/calc/add")
+                    || path.equals(base + "/calc/subtract");
 
             String header = ctx.header("Authorization");
 
-            // 2. Scenario A: User HAS a Token (Admin/User)
+            // Scenario A: User sends a Token (Verify it)
             if (header != null && header.startsWith("Bearer ")) {
                 String token = header.substring("Bearer ".length()).trim();
-                if (!JwtUtil.validateToken(token)) throw NotAuthorizedException.unauthorized("Invalid or expired token");
 
-                // Assign their REAL role from the token
+                if (!JwtUtil.validateToken(token)) {
+                    throw NotAuthorizedException.unauthorized("Invalid or expired token");
+                }
+
                 ctx.attribute("jwt.user", JwtUtil.getUsername(token));
                 ctx.attribute("jwt.role", JwtUtil.getRole(token));
             }
-            // 3. Scenario B: User is Public (Guest) with NO Token
+            // Scenario B: Route is Public (No token needed)
             else if (isPublic) {
-                // GIVE THEM A GUEST BADGE!
-                // This prevents "Missing role" errors in the controller
                 ctx.attribute("jwt.user", "guest");
-                ctx.attribute("jwt.role", "GUEST"); // or "any", depending on your Enum
+                ctx.attribute("jwt.role", Role.GUEST);
             }
-            // 4. Scenario C: Private Route + No Token = BLOCK
+            // Scenario C: Protected Route & No Token
             else {
                 throw NotAuthorizedException.unauthorized("Missing or invalid Authorization header");
             }
         });
 
-        server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
-        server.exception(NotAuthorizedException.class, (e, ctx) -> ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+        // Exception Handling
+        server.exception(ValidationException.class, (e, ctx) ->
+                ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+        server.exception(NotAuthorizedException.class, (e, ctx) ->
+                ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
         server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
         server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
 
         server.after(ApplicationConfig::afterRequest);
-
         server.start(port);
-        // logger.info("Server started on http://localhost:{}{}", port, "/api"); // valid if logger exists
+
         return server;
     }
 
@@ -135,12 +136,4 @@ public class ApplicationConfig {
         ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
-
-    private static void corsHeadersOptions(Context ctx) {
-        ctx.header("Access-Control-Allow-Origin", "*");
-        ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        ctx.status(204);
-    }
 }
-
