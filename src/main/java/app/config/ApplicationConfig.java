@@ -63,12 +63,7 @@ public class ApplicationConfig {
             String base = ctx.contextPath();
 
             // Check if route is public
-            boolean isPublic = path.equals(base + "/")
-                    || path.equals(base + "/routes")
-                    || path.startsWith(base + "/auth/")
-                    || path.startsWith(base + "/public/")
-                    || path.equals(base + "/calc/add")
-                    || path.equals(base + "/calc/subtract");
+            boolean isPublic = path.equals(base + "/") || path.equals(base + "/routes") || path.startsWith(base + "/auth/") || path.startsWith(base + "/public/") || path.equals(base + "/calc/add") || path.equals(base + "/calc/subtract");
 
             String header = ctx.header("Authorization");
 
@@ -95,10 +90,8 @@ public class ApplicationConfig {
         });
 
         // Exception Handling
-        server.exception(ValidationException.class, (e, ctx) ->
-                ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
-        server.exception(NotAuthorizedException.class, (e, ctx) ->
-                ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+        server.exception(ValidationException.class, (e, ctx) -> ctx.status(400).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
+        server.exception(NotAuthorizedException.class, (e, ctx) -> ctx.status(e.getStatus() == 0 ? 401 : e.getStatus()).json(Utils.convertToJsonMessage(ctx, "error", e.getMessage())));
         server.exception(ApiException.class, ApplicationConfig::apiExceptionHandler);
         server.exception(Exception.class, ApplicationConfig::generalExceptionHandler);
 
