@@ -8,7 +8,7 @@ This API provides basic mathematical operations (add, subtract, multiply, divide
 
 ## Endpoints & Role Access
 - http://localhost:7070/api/routes - routes overview with roles
-- http://calcAPI.marcuspff.com/api/routes - for deployed version
+- http://calcapi.marcuspff.com/api/routes - for deployed version
 ### Public Endpoints (No Auth Required)
 - `GET /api/auth/healthcheck` - Check API status
 - `POST /api/auth/login` - User login
